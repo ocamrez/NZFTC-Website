@@ -1,5 +1,5 @@
 'use strict';
-// Frontend demonstration only. Role selection is not authentication.
+// NZFTC frontend with API-based login and demonstration dashboard data.
 // window.name keeps fictional state across local HTML pages in the same tab.
 const initialState = () => ({version:1,role:null,profile:{email:'alex.taylor@example.com',phone:'',address:''},requests:[]});
 let state=initialState();
@@ -39,7 +39,73 @@ links.push(['about.html','About / Contact'],['login.html',state.role?'Switch dem
 $('navigation').innerHTML=links.map(([url,title])=>`<a href="${url}" ${page===url?'aria-current="page"':''}>${title}</a>`).join('')+(state.role?'<button class="secondary" id="logout">Sign out</button>':'');
 $('logout')?.addEventListener('click',()=>{state.role=null;save();location.href='MANAGE_NZFTC.html';});
 $('reset').addEventListener('click',()=>{if(confirm('Reset all fictional demo changes?')){state=initialState();save();location.href='MANAGE_NZFTC.html';}});
-$('demo-login')?.addEventListener('submit',event=>{event.preventDefault();state.role=$('role').value;save();location.href=state.role==='admin'?'admin.html':'dashboard.html';});
+// REAL DATABASE LOGIN
+$('login-form')?.addEventListener('submit', async event => {
+    event.preventDefault();
+
+    const username = $('username').value.trim();
+    const password = $('password').value;
+
+    const button = $('login-button');
+    const message = $('login-message');
+
+    button.disabled = true;
+    button.textContent = 'Signing in...';
+
+    message.textContent = '';
+    message.className = '';
+
+    try {
+        const response = await fetch(
+            'http://localhost:5128/api/auth/login',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username: username,
+                    password: password
+                })
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error('Incorrect username or password.');
+        }
+
+        const result = await response.json();
+
+        state.role = result.role.toLowerCase();
+        state.userID = result.userID;
+        state.username = result.username;
+
+        save();
+
+        message.textContent = 'Login successful! Redirecting...';
+
+        if (state.role === 'admin') {
+            location.href = 'admin.html';
+        }
+        else if (state.role === 'employee') {
+            location.href = 'dashboard.html';
+        }
+        else {
+            throw new Error('Invalid account role.');
+        }
+
+    } catch (error) {
+
+        message.textContent = error.message;
+        message.className = 'error';
+
+    } finally {
+
+        button.disabled = false;
+        button.textContent = 'Sign in';
+
+    }
+});
 if($('balance'))$('balance').textContent=balance();
 if($('pending'))$('pending').textContent=state.requests.filter(r=>r.employeeId==='EMP-DEMO-01'&&r.status==='Pending').length;
 if($('greeting'))$('greeting').textContent='Welcome back, '+employee().name.split(' ')[0];
